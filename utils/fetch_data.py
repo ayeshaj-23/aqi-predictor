@@ -2,6 +2,10 @@ import requests
 import os
 import json
 from dotenv import load_dotenv
+from datetime import datetime
+import csv
+
+CSV_FILE = "data/aqi_dataset.csv"
 
 load_dotenv()
 
@@ -19,6 +23,7 @@ def get_clean_data():
         "temp": data["iaqi"].get("t", {}).get("v"),
         "humidity": data["iaqi"].get("h", {}).get("v"),
         "wind": data["iaqi"].get("w", {}).get("v"),
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
 
     return cleaned
@@ -29,15 +34,13 @@ if __name__ == "__main__":
 
     os.makedirs("data", exist_ok=True)
 
-    file_path = "data/aqi_dataset.json"
+    file_exists = os.path.exists(CSV_FILE)
 
-    if os.path.exists(file_path):
-        with open(file_path, "r") as f:
-            dataset = json.load(f)
-    else:
-        dataset = []
+    with open(CSV_FILE, "a", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=data.keys())
 
-    dataset.append(data)
+        # write header ONLY once
+        if not file_exists:
+            writer.writeheader()
 
-    with open(file_path, "w") as f:
-        json.dump(dataset, f, indent=4)
+        writer.writerow(data)
