@@ -7,22 +7,33 @@ CSV_FILE = "data/aqi_dataset.csv"
 
 os.makedirs("data", exist_ok=True)
 
-# create file if not exists
 file_exists = os.path.exists(CSV_FILE)
 
-with open(CSV_FILE, "a", newline="") as f:
-    writer = None
+i = 0
 
-    for i in range(20):  
-        data = get_clean_data()
+while True:
 
-        if writer is None:
-            writer = csv.DictWriter(f, fieldnames=data.keys())
+    data = get_clean_data()
 
-            if not file_exists:
-                writer.writeheader()
+    # If API fails, skip safely
+    if data is None:
+        print("API failed, skipping this cycle...")
+        time.sleep(60)
+        continue
+
+    # Write to CSV safely
+    with open(CSV_FILE, "a", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=data.keys())
+
+        # Write header only once
+        if not file_exists:
+            writer.writeheader()
+            file_exists = True
 
         writer.writerow(data)
-        print(f"Saved row {i+1}")
 
-        time.sleep(30)  # 30 seconds between API calls
+    i += 1
+    print(f"Saved row {i}")
+
+    # wait before next API call
+    time.sleep(60)
