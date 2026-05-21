@@ -13,7 +13,7 @@ file_exists = os.path.exists(CSV_FILE)
 with open(CSV_FILE, "a", newline="") as f:
     writer = None
 
-    for i in range(20):  # 👈 THIS replaces manual runs
+    for i in range(20):  
         data = get_clean_data()
 
         if writer is None:
@@ -25,4 +25,4 @@ with open(CSV_FILE, "a", newline="") as f:
         writer.writerow(data)
         print(f"Saved row {i+1}")
 
-        time.sleep(60)  # wait 1 minute between API calls
+        time.sleep(30)  # 30 seconds between API calls
