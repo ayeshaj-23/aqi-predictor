@@ -13,7 +13,7 @@ from sklearn.metrics import (
 )
 
 # Load engineered dataset
-df = pd.read_csv("data/aqi_features.csv")
+df = pd.read_csv("features/feature_store.csv")
 
 print("Dataset loaded successfully!")
 print(df.head())
