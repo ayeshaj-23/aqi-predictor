@@ -1,57 +1,62 @@
 import joblib
 import pandas as pd
-
-# =========================
-# LOAD MODEL
-# =========================
+import numpy as np
 
 model = joblib.load("models/best_model.pkl")
 
-# =========================
-# LOAD FEATURE STORE
-# =========================
-
-df = pd.read_csv("features/feature_store.csv")
-
-features = [
-    "pm25",
-    "pm10",
-    "carbon_monoxide",
-    "nitrogen_dioxide",
-    "sulphur_dioxide",
-    "ozone",
-    "dust",
-    "uv_index",
-    "hour",
-    "day",
-    "month",
-    "aqi_change"
-]
-
-# Take latest row
-current_input = df[features].iloc[[-1]].copy()
 
 # =========================
-# FORECAST LOOP
+# BASE INPUT (you can adjust)
 # =========================
 
-predictions = []
+base_input = {
+    "pm25": 32.5,
+    "pm10": 37.4,
+    "carbon_monoxide": 495.0,
+    "nitrogen_dioxide": 40.0,
+    "sulphur_dioxide": 12.0,
+    "ozone": 20.0,
+    "dust": 25.0,
+    "uv_index": 6,
+    "hour": 12,
+    "day": 25,
+    "month": 5,
+    "aqi_change": 0.0
+}
 
-for i in range(3):
-
-    pred = model.predict(current_input)[0]
-    predictions.append(pred)
-
-    # Simulate future progression
-    current_input["hour"] += 1
-    current_input["aqi_change"] = pred * 0.01
 
 # =========================
-# RESULTS
+# FORECAST GENERATION
 # =========================
 
-print("\n🌫️ 3-DAY AQI FORECAST")
+def generate_day(input_data, drift):
+    """Simulate future pollution changes"""
+    
+    new_data = input_data.copy()
+
+    # small realistic changes (not random noise only)
+    new_data["pm25"] += drift * 1.5
+    new_data["pm10"] += drift * 1.2
+    new_data["carbon_monoxide"] += drift * 2
+
+    new_data["aqi_change"] = drift
+
+    df = pd.DataFrame([new_data])
+
+    return model.predict(df)[0]
+
+
+# =========================
+# 3-DAY FORECAST
+# =========================
+
+print("\n 3-DAY AQI FORECAST")
 print("========================")
 
-for i, p in enumerate(predictions, 1):
-    print(f"Day {i}: AQI = {p:.2f}")
+day1 = generate_day(base_input, drift=0)
+day2 = generate_day(base_input, drift=2)
+day3 = generate_day(base_input, drift=4)
+
+print(f"Day 1: AQI = {day1:.2f}")
+print(f"Day 2: AQI = {day2:.2f}")
+print(f"Day 3: AQI = {day3:.2f}")

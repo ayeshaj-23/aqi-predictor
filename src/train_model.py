@@ -1,24 +1,29 @@
 import pandas as pd
 import numpy as np
-import os
-import joblib
 
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import Ridge
-from sklearn.metrics import (
-    mean_absolute_error,
-    mean_squared_error,
-    r2_score
-)
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-# Load engineered dataset
+from xgboost import XGBRegressor
+import joblib
+
+
+# =========================
+# LOAD DATA
+# =========================
+
 df = pd.read_csv("features/feature_store.csv")
 
 print("Dataset loaded successfully!")
 print(df.head())
 
-# Select input features
+
+# =========================
+# FEATURES & TARGET
+# =========================
+
 X = df[
     [
         "pm25",
@@ -36,10 +41,13 @@ X = df[
     ]
 ]
 
-# Target
 y = df["future_aqi"]
 
-# Train-test split
+
+# =========================
+# TRAIN-TEST SPLIT
+# =========================
+
 X_train, X_test, y_train, y_test = train_test_split(
     X,
     y,
@@ -47,8 +55,9 @@ X_train, X_test, y_train, y_test = train_test_split(
     shuffle=False
 )
 
+
 # =========================
-# RANDOM FOREST MODEL
+# RANDOM FOREST
 # =========================
 
 print("\nTraining Random Forest model...")
@@ -70,15 +79,16 @@ print(f"MAE: {rf_mae:.2f}")
 print(f"RMSE: {rf_rmse:.2f}")
 print(f"R2 Score: {rf_r2:.2f}")
 
+
 # =========================
-# RIDGE MODEL
+# RIDGE REGRESSION
 # =========================
 
 print("\nTraining Ridge Regression model...")
 
 ridge_model = Ridge()
-
 ridge_model.fit(X_train, y_train)
+
 ridge_predictions = ridge_model.predict(X_test)
 
 ridge_mae = mean_absolute_error(y_test, ridge_predictions)
@@ -90,36 +100,66 @@ print(f"MAE: {ridge_mae:.2f}")
 print(f"RMSE: {ridge_rmse:.2f}")
 print(f"R2 Score: {ridge_r2:.2f}")
 
-# =========================
-# SAVE MODELS (NEW PART)
-# =========================
-
-os.makedirs("models", exist_ok=True)
-
-joblib.dump(rf_model, "models/random_forest.pkl")
-joblib.dump(ridge_model, "models/ridge.pkl")
-
-print("\nModels saved successfully ✔")
 
 # =========================
-# MODEL SELECTION (NEW)
+# XGBOOST MODEL
 # =========================
 
-if ridge_r2 > rf_r2:
-    best_model = ridge_model
-    best_name = "Ridge Regression"
-    best_r2 = ridge_r2
-else:
-    best_model = rf_model
-    best_name = "Random Forest"
-    best_r2 = rf_r2
+print("\nTraining XGBoost model...")
+
+xgb_model = XGBRegressor(
+    n_estimators=100,
+    learning_rate=0.1,
+    max_depth=5,
+    random_state=42
+)
+
+xgb_model.fit(X_train, y_train)
+
+xgb_predictions = xgb_model.predict(X_test)
+
+xgb_mae = mean_absolute_error(y_test, xgb_predictions)
+xgb_rmse = np.sqrt(mean_squared_error(y_test, xgb_predictions))
+xgb_r2 = r2_score(y_test, xgb_predictions)
+
+print("\n=== XGBoost Results ===")
+print(f"MAE: {xgb_mae:.2f}")
+print(f"RMSE: {xgb_rmse:.2f}")
+print(f"R2 Score: {xgb_r2:.2f}")
+
+
+# =========================
+# MODEL SELECTION
+# =========================
 
 print("\n=========================")
-print("BEST MODEL SELECTED")
+print("BEST MODEL SELECTION")
 print("=========================")
+
+best_model = rf_model
+best_score = rf_r2
+
+best_name = "Random Forest"
+
+if ridge_r2 > best_score:
+    best_model = ridge_model
+    best_score = ridge_r2
+    best_name = "Ridge Regression"
+
+if xgb_r2 > best_score:
+    best_model = xgb_model
+    best_score = xgb_r2
+    best_name = "XGBoost"
+
+
 print(f"Model: {best_name}")
-print(f"R2 Score: {best_r2:.2f}")
+print(f"R2 Score: {best_score:.2f}")
+
+
+# =========================
+# SAVE MODEL
+# =========================
 
 joblib.dump(best_model, "models/best_model.pkl")
 
-print("Best model saved as best_model.pkl ✔")
+print("Best model saved successfully ✔")
