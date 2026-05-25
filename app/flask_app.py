@@ -6,6 +6,28 @@ app = Flask(__name__)
 
 model = joblib.load("models/best_model.pkl")
 
+
+# =========================
+# AQI CATEGORY FUNCTION
+# =========================
+
+def get_aqi_category(aqi):
+    if aqi <= 50:
+        return "Good"
+    elif aqi <= 100:
+        return "Moderate"
+    elif aqi <= 150:
+        return "Unhealthy for Sensitive Groups"
+    elif aqi <= 200:
+        return "Unhealthy"
+    else:
+        return "Very Unhealthy"
+
+
+# =========================
+# HTML UI
+# =========================
+
 HTML = """
 <!DOCTYPE html>
 <html>
@@ -21,12 +43,12 @@ HTML = """
             background: white;
             padding: 20px;
             border-radius: 10px;
-            width: 400px;
+            width: 420px;
         }
         input {
             width: 100%;
-            padding: 5px;
-            margin-bottom: 10px;
+            padding: 6px;
+            margin-bottom: 8px;
         }
         button {
             padding: 10px;
@@ -34,6 +56,7 @@ HTML = """
             color: white;
             border: none;
             cursor: pointer;
+            width: 100%;
         }
         .result {
             margin-top: 20px;
@@ -47,7 +70,7 @@ HTML = """
 <body>
 
 <div class="container">
-<h1>🌍 AQI Predictor</h1>
+<h1> AQI Predictor</h1>
 
 <form method="POST">
 
@@ -80,16 +103,10 @@ AQI Change: <input name="change" required>
 </html>
 """
 
-def get_category(aqi):
-    if aqi <= 50:
-        return "Good 😊"
-    elif aqi <= 100:
-        return "Moderate 🙂"
-    elif aqi <= 150:
-        return "Unhealthy for Sensitive Groups 😷"
-    else:
-        return "Unhealthy ☠️"
 
+# =========================
+# ROUTE
+# =========================
 
 @app.route("/", methods=["GET", "POST"])
 def home():
@@ -119,10 +136,14 @@ def home():
         ])
 
         prediction = model.predict(df)[0]
-        category = get_category(prediction)
+        category = get_aqi_category(prediction)
 
     return render_template_string(HTML, prediction=prediction, category=category)
 
+
+# =========================
+# RUN APP
+# =========================
 
 if __name__ == "__main__":
     app.run(debug=True)
