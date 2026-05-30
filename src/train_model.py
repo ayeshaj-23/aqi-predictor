@@ -1,165 +1,126 @@
 import pandas as pd
 import numpy as np
-
+import os
+import json
+import joblib
+from feast import FeatureStore
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import Ridge
+from xgboost import XGBRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-from xgboost import XGBRegressor
-import joblib
+print("Loading Feature Store...")
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+store = FeatureStore(repo_path=os.path.join(BASE_DIR, "feature_store"))
 
-# =========================
-# LOAD DATA
-# =========================
+# ----------------------------
+# STEP 1: ENTITY DATAFRAME
+# ----------------------------
+df = pd.read_csv(os.path.join(BASE_DIR, "feature_store/data/karachi_features.csv"))
+df["time"] = pd.to_datetime(df["time"])
+entity_df = df[["aqi_id", "time"]].copy()
 
-df = pd.read_csv("features/feature_store.csv")
+# ----------------------------
+# STEP 2: GET FEATURES FROM FEAST
+# ----------------------------
+print("Fetching features from Feast...")
+training_df = store.get_historical_features(
+    entity_df=entity_df,
+    features=[
+        "aqi_features:temperature_2m",
+        "aqi_features:relative_humidity_2m",
+        "aqi_features:wind_speed_10m",
+        "aqi_features:aqi",
+        "aqi_features:aqi_change",
+        "aqi_features:aqi_lag_1",
+        "aqi_features:aqi_lag_2",
+        "aqi_features:aqi_lag_3",
+        "aqi_features:aqi_rolling_3h",
+        "aqi_features:aqi_rolling_6h",
+        "aqi_features:hour",
+        "aqi_features:day",
+        "aqi_features:month",
+        "aqi_features:weekday",
+        "aqi_features:future_aqi",
+    ],
+).to_df()
 
-print("Dataset loaded successfully!")
-print(df.head())
+print(f"✅ Loaded {len(training_df)} rows from Feast")
+training_df = training_df.dropna()
 
-
-# =========================
-# FEATURES & TARGET
-# =========================
-
-X = df[
-    [
-        "pm25",
-        "pm10",
-        "carbon_monoxide",
-        "nitrogen_dioxide",
-        "sulphur_dioxide",
-        "ozone",
-        "dust",
-        "uv_index",
-        "hour",
-        "day",
-        "month",
-        "aqi_change"
-    ]
+# ----------------------------
+# STEP 3: FEATURES & TARGET
+# ----------------------------
+FEATURES = [
+    "temperature_2m", "relative_humidity_2m", "wind_speed_10m",
+    "aqi", "aqi_change", "aqi_lag_1", "aqi_lag_2", "aqi_lag_3",
+    "aqi_rolling_3h", "aqi_rolling_6h", "hour", "day", "month", "weekday"
 ]
+TARGET = "future_aqi"
 
-y = df["future_aqi"]
+X = training_df[FEATURES]
+y = training_df[TARGET]
 
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# =========================
-# TRAIN-TEST SPLIT
-# =========================
+# ----------------------------
+# STEP 4: TRAIN MODELS
+# ----------------------------
+models = {
+    "random_forest": RandomForestRegressor(n_estimators=100, random_state=42),
+    "ridge": Ridge(),
+    "xgboost": XGBRegressor(n_estimators=100, random_state=42, verbosity=0),
+}
 
-X_train, X_test, y_train, y_test = train_test_split(
-    X,
-    y,
-    test_size=0.2,
-    shuffle=False
-)
+os.makedirs(os.path.join(BASE_DIR, "model_registry"), exist_ok=True)
 
+results = {}
+best_model = None
+best_score = -np.inf
+best_name = ""
 
-# =========================
-# RANDOM FOREST
-# =========================
+for name, model in models.items():
+    print(f"\nTraining {name}...")
+    model.fit(X_train, y_train)
+    pred = model.predict(X_test)
 
-print("\nTraining Random Forest model...")
+    mae  = mean_absolute_error(y_test, pred)
+    rmse = mean_squared_error(y_test, pred) ** 0.5
+    r2   = r2_score(y_test, pred)
 
-rf_model = RandomForestRegressor(
-    n_estimators=100,
-    random_state=42
-)
+    print(f"  MAE : {mae:.2f}")
+    print(f"  RMSE: {rmse:.2f}")
+    print(f"  R2  : {r2:.4f}")
 
-rf_model.fit(X_train, y_train)
-rf_predictions = rf_model.predict(X_test)
+    results[name] = {"mae": mae, "rmse": rmse, "r2": r2}
 
-rf_mae = mean_absolute_error(y_test, rf_predictions)
-rf_rmse = np.sqrt(mean_squared_error(y_test, rf_predictions))
-rf_r2 = r2_score(y_test, rf_predictions)
+    # Save each model
+    joblib.dump(model, os.path.join(BASE_DIR, f"model_registry/{name}.pkl"))
 
-print("\n=== Random Forest Results ===")
-print(f"MAE: {rf_mae:.2f}")
-print(f"RMSE: {rf_rmse:.2f}")
-print(f"R2 Score: {rf_r2:.2f}")
+    if r2 > best_score:
+        best_score = r2
+        best_model = model
+        best_name = name
 
+# ----------------------------
+# STEP 5: SAVE BEST MODEL
+# ----------------------------
+joblib.dump(best_model, os.path.join(BASE_DIR, "model_registry/best_model.pkl"))
 
-# =========================
-# RIDGE REGRESSION
-# =========================
+metadata = {
+    "best_model": best_name,
+    "r2_score": float(best_score),
+    "features": FEATURES,
+    "all_models": results
+}
 
-print("\nTraining Ridge Regression model...")
+with open(os.path.join(BASE_DIR, "model_registry/metadata.json"), "w") as f:
+    json.dump(metadata, f, indent=2)
 
-ridge_model = Ridge()
-ridge_model.fit(X_train, y_train)
-
-ridge_predictions = ridge_model.predict(X_test)
-
-ridge_mae = mean_absolute_error(y_test, ridge_predictions)
-ridge_rmse = np.sqrt(mean_squared_error(y_test, ridge_predictions))
-ridge_r2 = r2_score(y_test, ridge_predictions)
-
-print("\n=== Ridge Regression Results ===")
-print(f"MAE: {ridge_mae:.2f}")
-print(f"RMSE: {ridge_rmse:.2f}")
-print(f"R2 Score: {ridge_r2:.2f}")
-
-
-# =========================
-# XGBOOST MODEL
-# =========================
-
-print("\nTraining XGBoost model...")
-
-xgb_model = XGBRegressor(
-    n_estimators=100,
-    learning_rate=0.1,
-    max_depth=5,
-    random_state=42
-)
-
-xgb_model.fit(X_train, y_train)
-
-xgb_predictions = xgb_model.predict(X_test)
-
-xgb_mae = mean_absolute_error(y_test, xgb_predictions)
-xgb_rmse = np.sqrt(mean_squared_error(y_test, xgb_predictions))
-xgb_r2 = r2_score(y_test, xgb_predictions)
-
-print("\n=== XGBoost Results ===")
-print(f"MAE: {xgb_mae:.2f}")
-print(f"RMSE: {xgb_rmse:.2f}")
-print(f"R2 Score: {xgb_r2:.2f}")
-
-
-# =========================
-# MODEL SELECTION
-# =========================
-
-print("\n=========================")
-print("BEST MODEL SELECTION")
-print("=========================")
-
-best_model = rf_model
-best_score = rf_r2
-
-best_name = "Random Forest"
-
-if ridge_r2 > best_score:
-    best_model = ridge_model
-    best_score = ridge_r2
-    best_name = "Ridge Regression"
-
-if xgb_r2 > best_score:
-    best_model = xgb_model
-    best_score = xgb_r2
-    best_name = "XGBoost"
-
-
-print(f"Model: {best_name}")
-print(f"R2 Score: {best_score:.2f}")
-
-
-# =========================
-# SAVE MODEL
-# =========================
-
-joblib.dump(best_model, "models/best_model.pkl")
-
-print("Best model saved successfully ✔")
+print("\n=============================")
+print(f"✅ Best Model : {best_name}")
+print(f"✅ Best R2    : {best_score:.4f}")
+print("✅ All models saved to model_registry/")
+print("=============================")
