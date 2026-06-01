@@ -75,7 +75,7 @@ jobs:
       - name: Run Feast Apply
         run: |
           cd feature_store
-          python -m feast apply
+          python -c "from feast.cli import cli; cli()" apply
 
       - name: Run Training Pipeline
         run: python src/train_model.py
