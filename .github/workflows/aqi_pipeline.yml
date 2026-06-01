@@ -73,7 +73,9 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run Feast Apply
-        run: python feature_store/run_feast.py
+        run: |
+          cd feature_store
+          feast apply
 
       - name: Run Training Pipeline
         run: python src/train_model.py
