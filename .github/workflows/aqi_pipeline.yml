@@ -75,7 +75,7 @@ jobs:
       - name: Run Feast Apply
         run: |
           cd feature_store
-          feast apply
+          python -m feast apply
 
       - name: Run Training Pipeline
         run: python src/train_model.py
