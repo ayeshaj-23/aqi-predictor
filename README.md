@@ -1,113 +1,103 @@
-# AQI Predictor (End-to-End ML + MLOps Project)
+# Karachi AQI Predictor — End-to-End MLOps Project
 
-This project predicts Air Quality Index (AQI) using real-world pollution and weather data.
-
-It demonstrates a full machine learning pipeline — from data collection to deployment — following MLOps principles.
-
----
-
-## What this project does
-
-- Collects AQI + weather data from an external API  
-- Processes raw data into ML-ready features  
-- Stores features in a simulated feature store (CSV-based, Hopsworks-compatible design)  
-- Trains multiple machine learning models  
-- Automatically selects the best performing model  
-- Deploys predictions using a Flask web application  
-- Automates training using GitHub Actions (CI/CD pipeline)
+An automated, end-to-end Air Quality Index (AQI) prediction system for Karachi, Pakistan.
+Built as part of the 10 Pearls SHINE Internship 2026 at Habib University.
 
 ---
 
 ## System Architecture
-API → Raw Data → Feature Engineering → Feature Store → Model Training → Model Selection → Model Registry → Flask Web App
 
-
----
-
-## Pipeline Workflow
-
-### Data Collection
-- Fetches AQI and weather data from external API
-- Stores raw dataset in `data/aqi_dataset.csv`
-
-### Feature Engineering
-- Time-based features:
-  - hour, day, month
-- Derived features:
-  - AQI change rate
-- Output saved in feature store
+Open-Meteo API + AQICN API → Feature Pipeline (hourly) → Feast Feature Store → Training Pipeline (daily) → Model Registry → Streamlit Dashboard
 
 ---
 
-### Feature Store
-- CSV-based simulated feature store
-- Designed to be compatible with Hopsworks-style architecture
+## Project Structure
+
+aqi-predictor/
+├── fetch_data.py                  # Hourly data collection from AQICN API
+├── utils/feature_engineering.py   # Feature engineering pipeline
+├── feature_store/                 # Feast feature store setup
+│   ├── feature_repo.py
+│   ├── feature_store.yaml
+│   └── data/
+├── src/train_model.py             # Training pipeline (reads from Feast)
+├── model_registry/                # Saved models + metadata
+│   ├── random_forest.pkl
+│   ├── ridge.pkl
+│   ├── xgboost.pkl
+│   ├── best_model.pkl
+│   └── metadata.json
+├── app/streamlit_app.py           # Streamlit dashboard
+├── notebooks/
+│   ├── eda.py                     # EDA script
+│   └── eda_plots/                 # 8 EDA charts
+├── .github/workflows/
+│   └── aqi_pipeline.yml           # CI/CD pipeline
+└── requirements.txt
 
 ---
 
-### Model Training
+## Features
 
-Models used:
-- Random Forest Regressor  
-- Ridge Regression  
-- XGBoost (optional comparison)
-
-Evaluation metrics:
-- MAE  
-- RMSE  
-- R² Score  
-
-Best model is selected automatically based on R² score.
-
----
-
-### Model Deployment
-
-- Flask web application
-- Real-time AQI prediction
-- Health category + alerts
-- 3-day forecast visualization
-
----
-
-### CI/CD Pipeline
-
-Implemented using GitHub Actions:
-
-- Automated feature engineering (scheduled runs)
-- Automated model training pipeline
-- Continuous model improvement workflow
+- Fetches hourly weather and AQI data from Open-Meteo and AQICN APIs
+- Engineers 14 features including lag features, rolling averages, and time features
+- Stores features in Feast feature store (Parquet + SQLite)
+- Trains 3 ML models daily and selects the best automatically
+- Displays 3-day AQI forecast on an interactive Streamlit dashboard
+- SHAP feature importance explanations
+- Hazard alerts for unhealthy AQI levels
+- Fully automated via GitHub Actions (hourly + daily jobs)
 
 ---
 
 ## Model Performance
 
-| Model            | MAE  | RMSE | R² Score |
-|------------------|------|------|----------|
-| Random Forest    | ~2.2 | ~4.2 | 0.94     |
-| Ridge Regression | ~1.7 | ~3.0 | 0.97     |
-| XGBoost          | ~2.4 | ~5.1 | 0.91     |
+| Model | MAE | RMSE | R² |
+|---|---|---|---|
+| Random Forest | 2.15 | 3.07 | 0.9327 |
+| Ridge Regression | 2.18 | 3.08 | 0.9322 |
+| XGBoost | 2.13 | 2.97 | 0.9370 |
 
-Best Model: Ridge Regression
+**Best Model: XGBoost (R² = 0.9370)**
 
 ---
 
-## Web Application
+## How to Run
 
-Users can:
-- Input pollutant values
-- Get real-time AQI prediction
-- View air quality category
-- See health alerts
-- View 3-day forecast graph
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run feature engineering
+python utils/feature_engineering.py
+
+# Apply Feast feature store
+cd feature_store && python run_feast.py
+
+# Train models
+python src/train_model.py
+
+# Run dashboard
+streamlit run app/streamlit_app.py
+```
+
+---
+
+## CI/CD Pipeline
+
+Two automated GitHub Actions jobs:
+- **Feature pipeline** — runs every hour, fetches data and updates features
+- **Training pipeline** — runs every day, retrains models and updates model registry
+
+---
+
+## Tech Stack
+
+Python, Scikit-learn, XGBoost, Feast, GitHub Actions, Streamlit, SHAP, Open-Meteo API, AQICN API
+
+---
 
 ## Author
 
-Ayesha Jawed  
-Social Development & Policy | Habib University  
-
----
-
-## Note
-
-This project demonstrates an end-to-end MLOps pipeline including feature engineering, model training, automated selection, and deployment.
+Ayesha Jawed
+10 Pearls SHINE Internship 2026 | Habib University
